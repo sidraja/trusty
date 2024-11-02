@@ -104,6 +104,15 @@ Trusty is an AI-powered shopping agent that helps users make informed purchasing
 3. Run the test suite
 4. Submit a pull request
 
-## License
+## Legal Notice
 
-[Your chosen license]
+This software is proprietary and confidential. All rights reserved. 
+See the LICENSE file for full license details.
+
+## Security
+
+See SECURITY.md for reporting security vulnerabilities.
+
+## Contributing
+
+This is a private repository. External contributions are not accepted at this time.
