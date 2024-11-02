@@ -34,7 +34,8 @@ DEBUG = env('DEBUG')
 SECRET_KEY = env('SECRET_KEY')
 FE_BASE_URL = env('FE_BASE_URL', default='http://localhost:3000/')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# Update ALLOWED_HOSTS to be more permissive in debug mode
+ALLOWED_HOSTS = ['*'] if DEBUG else ['localhost', '127.0.0.1']
 
 # Application definition
 INSTALLED_APPS = [
@@ -54,6 +55,12 @@ INSTALLED_APPS = [
     # Local apps
     'core',
 ]
+
+# Add DEBUG_TOOLBAR if in development
+if DJANGO_ENV == 'development':
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+    INTERNAL_IPS = ['127.0.0.1']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -130,37 +137,42 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer' if DEBUG else 'rest_framework.renderers.JSONRenderer',
+    ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
+    'PAGE_SIZE': 10,
+    'EXCEPTION_HANDLER': 'core.utils.custom_exception_handler'
 }
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': False,
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1) if DEBUG else timedelta(minutes=60),  # Longer in debug
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
-
+    'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
-
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 # Channels configuration
 CHANNEL_LAYERS = {
@@ -173,9 +185,16 @@ CHANNEL_LAYERS = {
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
     'root': {
@@ -188,5 +207,31 @@ LOGGING = {
             'level': env('DJANGO_LOG_LEVEL', default='INFO'),
             'propagate': False,
         },
+        'core': {  # Add specific logger for our app
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
     },
 }
+
+# Add custom settings for our application
+BRIDGE_API = {
+    'BASE_URL': env('BRIDGE_API_URL', default='https://api.bridge.com/v1/'),
+    'API_KEY': env('BRIDGE_API_KEY', default='demo_key'),
+}
+
+AGENT_SETTINGS = {
+    'DEFAULT_TRUST_SCORE': 50,
+    'MAX_BUDGET_LIMIT': 10000,
+    'ALLOWED_MERCHANTS': ['Amazon', 'BestBuy', 'Walmart'],  # Default allowed merchants
+}
+
+# Add test settings if running tests
+if 'test' in sys.argv or 'pytest' in sys.argv[0]:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'test_db.sqlite3',
+    }
+    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+    SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'] = timedelta(days=1)

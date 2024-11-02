@@ -7,6 +7,7 @@ from decimal import Decimal
 from ..models import AgentTemplate, AgentInstance, Transaction
 import json
 
+
 class UserRegistrationViewTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -19,13 +20,14 @@ class UserRegistrationViewTests(TestCase):
 
     def test_user_registration(self):
         response = self.client.post(
-            self.register_url, 
+            self.register_url,
             self.user_data,
             format='json'
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn('wallet_address', response.data)
         self.assertTrue(response.data['wallet_address'].startswith('0x'))
+
 
 class AgentSetupViewTests(TestCase):
     def setUp(self):
@@ -62,6 +64,7 @@ class AgentSetupViewTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['status'], 'IDLE')
+
 
 class TransactionVerificationViewTests(TestCase):
     def setUp(self):
@@ -105,4 +108,4 @@ class TransactionVerificationViewTests(TestCase):
             self.transaction_data,
             format='json'
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST) 
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

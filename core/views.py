@@ -50,24 +50,29 @@ class AgentSetupView(APIView):
     def post(self, request):
         """
         Configure a new shopping agent instance for the user.
-        Requires template_id, constraints, and budget information.
         """
-        serializer = AgentSetupSerializer(data=request.data)
         try:
-            serializer.is_valid(raise_exception=True)
-            with transaction.atomic():
-                agent_instance = AgentInstance.objects.create(
-                    user=request.user,
-                    **serializer.validated_data
-                )
+            # Log incoming request data
+            logger.info(f"Agent setup request data: {request.data}")
+            
+            # Add the user to the data
+            data = request.data.copy()
+            data['user'] = request.user.id
+            
+            logger.info(f"Processing agent setup with data: {data}")
+            
+            serializer = AgentInstanceSerializer(data=data)
+            if serializer.is_valid():
+                logger.info(f"Serializer valid with data: {serializer.validated_data}")
+                agent = serializer.save(user=request.user)
+                logger.info(f"Agent created with ID: {agent.id}")
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                logger.error(f"Serializer errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
                 
-                response_serializer = AgentInstanceSerializer(agent_instance)
-                return Response(
-                    response_serializer.data, 
-                    status=status.HTTP_201_CREATED
-                )
         except Exception as e:
-            logger.error(f"Agent setup failed: {str(e)}")
+            logger.error(f"Agent setup failed: {str(e)}", exc_info=True)
             return Response({
                 'error': 'Setup failed',
                 'detail': str(e)
@@ -116,16 +121,43 @@ class AgentStatusView(APIView):
     
     def get(self, request, agent_id):
         """
-        Check the current status of an agent and its latest transaction.
+        Get the current status of an agent instance.
         """
-        agent = get_object_or_404(
-            AgentInstance.objects.select_related('latest_transaction'),
-            id=agent_id,
-            user=request.user
-        )
-        
-        serializer = AgentStatusSerializer(agent)
-        return Response(serializer.data)
+        try:
+            agent = get_object_or_404(
+                AgentInstance.objects.select_related('user', 'template'),
+                id=agent_id,
+                user=request.user
+            )
+            
+            # Get the latest transaction if it exists
+            latest_transaction = Transaction.objects.filter(
+                agent_instance=agent
+            ).order_by('-created_at').first()
+            
+            response_data = {
+                'status': agent.status,
+                'trust_score': agent.trust_score,
+                'latest_transaction': None
+            }
+            
+            if latest_transaction:
+                response_data['latest_transaction'] = {
+                    'id': latest_transaction.id,
+                    'status': latest_transaction.status,
+                    'amount': str(latest_transaction.amount),
+                    'merchant': latest_transaction.merchant,
+                    'created_at': latest_transaction.created_at
+                }
+            
+            return Response(response_data)
+            
+        except Exception as e:
+            logger.error(f"Error getting agent status: {str(e)}", exc_info=True)
+            return Response({
+                'error': 'Failed to get agent status',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TransactionVerificationView(APIView):
     permission_classes = [IsAuthenticated]

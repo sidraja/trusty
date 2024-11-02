@@ -3,10 +3,16 @@ from .views import (
     UserRegistrationView,
     AgentSetupView,
     AgentShoppingView,
+    AgentStatusView,
+    TransactionVerificationView
 )
 
+app_name = 'core'
+
 urlpatterns = [
-    path('register/', UserRegistrationView.as_view(), name='user-registration'),
+    path('auth/register/', UserRegistrationView.as_view(), name='user-registration'),
     path('agents/setup/', AgentSetupView.as_view(), name='agent-setup'),
     path('agents/<int:agent_id>/shop/', AgentShoppingView.as_view(), name='agent-shopping'),
+    path('agents/<int:agent_id>/status/', AgentStatusView.as_view(), name='agent-status'),
+    path('transactions/verify/', TransactionVerificationView.as_view(), name='transaction-verify'),
 ]

@@ -41,6 +41,9 @@ class AgentInstanceSerializer(serializers.ModelSerializer):
         read_only_fields = ('status', 'trust_score')
     
     def validate_constraints(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Constraints must be a dictionary")
+            
         required_keys = {'max_price', 'categories', 'preferences'}
         if not all(key in value for key in required_keys):
             raise serializers.ValidationError(
