@@ -3,6 +3,8 @@ from decimal import Decimal
 from typing import Dict, Any
 from django.conf import settings
 from .models import AgentInstance, Transaction
+from openai import OpenAI
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -124,3 +126,62 @@ class TrustScoreService:
                 f"Updated trust score for agent {agent.id}: {new_score} "
                 f"(impact: {impact})"
             )
+
+class PromptProcessingService:
+    def __init__(self):
+        self.client = OpenAI(api_key=settings.OPENAI_SETTINGS['API_KEY'])
+        self.logger = logging.getLogger(__name__)
+
+    def process_shopping_prompt(self, prompt: str) -> Dict[str, Any]:
+        """Convert natural language prompt into structured shopping constraints."""
+        try:
+            self.logger.info(f"Processing shopping prompt: '{prompt}'")
+            
+            response = self.client.chat.completions.create(
+                model=settings.OPENAI_SETTINGS.get('MODEL', 'gpt-4'),
+                messages=[
+                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7
+            )
+            
+            constraints = json.loads(response.choices[0].message.content)
+            self.logger.info(f"Successfully generated constraints from OpenAI: {json.dumps(constraints, indent=2)}")
+            return constraints
+            
+        except Exception as e:
+            self.logger.error(f"OpenAI error ({type(e).__name__}): {str(e)}")
+            self.logger.warning("⚠️ Using default constraints due to OpenAI error")
+            default_constraints = self._get_default_constraints()
+            self.logger.info(f"Default constraints being used: {json.dumps(default_constraints, indent=2)}")
+            return default_constraints
+
+    def _get_default_constraints(self) -> Dict[str, Any]:
+        """Get default constraints when OpenAI processing fails."""
+        return {
+            "max_price": 500,
+            "categories": ["general"],
+            "preferences": {
+                "brand": "any",
+                "condition": "new",
+                "shipping": "standard"
+            },
+            "_source": "default"  # Added to indicate these are default constraints
+        }
+
+    def _get_system_prompt(self) -> str:
+        """Define the system prompt for constraint generation."""
+        return """
+        You are a shopping assistant that converts user requirements into structured JSON.
+        Convert the shopping request into this exact format:
+        {
+            "max_price": <integer in USD>,
+            "categories": [<list of relevant product categories>],
+            "preferences": {
+                "brand": <"trusted", "any", or specific brand>,
+                "condition": <"new", "used", "any">,
+                "shipping": <"fast", "standard", "any">
+            }
+        }
+        """

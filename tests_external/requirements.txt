@@ -1,1 +1,4 @@
 requests>=2.31.0
+python-environ>=0.4.54
+pytest>=8.0.0
+pytest-django>=4.8.0

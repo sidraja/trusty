@@ -6,6 +6,8 @@ from django.contrib.auth.models import User
 from decimal import Decimal
 from ..models import AgentTemplate, AgentInstance, Transaction
 import json
+from unittest.mock import patch
+from django.conf import settings
 
 
 class UserRegistrationViewTests(TestCase):
@@ -45,25 +47,56 @@ class AgentSetupViewTests(TestCase):
         self.client.force_authenticate(user=self.user)
         self.setup_url = reverse('agent-setup')
         self.setup_data = {
+            'prompt': 'I want to buy a new laptop under $1000',
             'template_id': self.template.id,
-            'constraints': {
-                'max_price': 500,
-                'categories': ['electronics'],
-                'preferences': {'brand': 'trusted'}
-            },
-            'max_budget': '1000.00',
-            'allowed_merchants': ['Amazon', 'BestBuy'],
             'bridge_wallet_address': '0x1234567890abcdef1234567890abcdef12345678'
         }
+        
+        # Mock response for OpenAI
+        self.mock_constraints = {
+            'max_price': 1000,
+            'categories': ['electronics', 'laptops'],
+            'preferences': {
+                'brand': 'trusted',
+                'condition': 'new',
+                'shipping': 'standard'
+            }
+        }
 
-    def test_agent_setup(self):
+    @patch('core.services.PromptProcessingService.process_shopping_prompt')
+    def test_agent_setup(self, mock_process):
+        # Configure mock
+        mock_process.return_value = self.mock_constraints
+        
         response = self.client.post(
             self.setup_url,
             self.setup_data,
             format='json'
         )
+        
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['status'], 'IDLE')
+        self.assertEqual(
+            response.data['constraints']['max_price'],
+            self.mock_constraints['max_price']
+        )
+        
+        # Verify mock was called with correct prompt
+        mock_process.assert_called_once_with(self.setup_data['prompt'])
+
+    @patch('core.services.PromptProcessingService.process_shopping_prompt')
+    def test_agent_setup_no_prompt(self, mock_process):
+        data = self.setup_data.copy()
+        del data['prompt']
+        
+        response = self.client.post(
+            self.setup_url,
+            data,
+            format='json'
+        )
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('prompt', response.data['error'])
 
 
 class TransactionVerificationViewTests(TestCase):

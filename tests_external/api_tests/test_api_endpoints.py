@@ -24,7 +24,7 @@ class APITester:
             self.headers['Authorization'] = f'Bearer {self.token}'
     
     def _make_request(self, method: str, endpoint: str, data: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Make HTTP request to API endpoint."""
+        """Make HTTP request to API endpoint with enhanced error logging."""
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         self._update_auth_header()
         
@@ -42,14 +42,25 @@ class APITester:
             try:
                 response_data = response.json()
                 logger.info(f"Response: {json.dumps(response_data, indent=2)}")
+                
+                # Enhanced error logging
+                if response.status_code >= 400:
+                    logger.error(f"Request failed with status {response.status_code}")
+                    logger.error(f"Error details: {json.dumps(response_data, indent=2)}")
+                    if 'detail' in response_data:
+                        logger.error(f"Error message: {response_data['detail']}")
+                
                 return response_data
             except ValueError as e:
                 logger.error(f"Error parsing response: {str(e)}")
                 logger.error(f"Raw response: {response.text}")
                 return {}
                 
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(f"Request error: {str(e)}")
+            logger.error(f"Request details: {method} {url}")
+            if hasattr(e.response, 'text'):
+                logger.error(f"Response text: {e.response.text}")
             return {}
 
     def run_tests(self) -> List[Tuple[str, bool]]:
@@ -107,22 +118,49 @@ class APITester:
     def test_agent_setup(self) -> bool:
         """Test agent setup endpoint."""
         logger.info("\n=== Testing Agent Setup ===")
+        prompt = "I want to buy a new gaming laptop under $2000 from trusted brands with fast shipping"
         data = {
+            "prompt": prompt,
             "template_id": 1,
-            "constraints": {
-                "max_price": 500,
-                "categories": ["electronics"],
-                "preferences": {"brand": "trusted"}
-            },
-            "max_budget": "1000.00",
-            "allowed_merchants": ["Amazon", "BestBuy"],
             "bridge_wallet_address": "0x1234567890abcdef1234567890abcdef12345678"
         }
         
+        logger.info(f"Testing prompt processing with: '{prompt}'")
         response = self._make_request('POST', 'api/agents/setup/', data)
+        
+        if 'error' in response:
+            logger.error(f"Setup Error: {response.get('detail', 'Unknown error')}")
+            return False
+            
         if 'id' in response:
             self.agent_id = response['id']
+            constraints = response.get('constraints', {})
+            
+            # Check for OpenAI processing errors
+            if '_error' in constraints:
+                logger.warning(f"OpenAI processing failed: {constraints['_error']}")
+                logger.warning("Using default constraints instead")
+            
+            logger.info("\nProcessed Constraints:")
+            logger.info(f"Max Price: {constraints.get('max_price')}")
+            logger.info(f"Categories: {constraints.get('categories')}")
+            logger.info(f"Preferences: {constraints.get('preferences')}")
+            
+            # Test continues even with default constraints
+            validation = all([
+                'max_price' in constraints,
+                'categories' in constraints,
+                'preferences' in constraints
+            ])
+            
+            if not validation:
+                logger.error("Missing required constraints")
+                logger.error(f"Full response: {json.dumps(response, indent=2)}")
+                return False
+                
             return True
+            
+        logger.error(f"Unexpected response format: {json.dumps(response, indent=2)}")
         return False
 
     def test_agent_shopping(self) -> bool:

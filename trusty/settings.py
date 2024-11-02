@@ -15,18 +15,22 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 import environ
+import os
 
 # Initialize environ
 env = environ.Env(
     DEBUG=(bool, False),
-    DJANGO_ENV=(str, 'production'),
+    DJANGO_ENV=(str, 'development'),
+    SECURE_SSL_REDIRECT=(bool, False),
+    SESSION_COOKIE_SECURE=(bool, False),
+    CSRF_COOKIE_SECURE=(bool, False),
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Take environment variables from .env file
-environ.Env.read_env(BASE_DIR / '.env')
+env.read_env(str(BASE_DIR / '.env'))  # Convert Path to string
 
 # Basic settings
 DJANGO_ENV = env('DJANGO_ENV')
@@ -34,8 +38,13 @@ DEBUG = env('DEBUG')
 SECRET_KEY = env('SECRET_KEY')
 FE_BASE_URL = env('FE_BASE_URL', default='http://localhost:3000/')
 
-# Update ALLOWED_HOSTS to be more permissive in debug mode
-ALLOWED_HOSTS = ['*'] if DEBUG else ['localhost', '127.0.0.1']
+# Security settings
+SECURE_SSL_REDIRECT = env('SECURE_SSL_REDIRECT')
+SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE')
+CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE')
+
+# Update ALLOWED_HOSTS to use env variable
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # Application definition
 INSTALLED_APPS = [
@@ -95,9 +104,8 @@ WSGI_APPLICATION = 'trusty.wsgi.application'
 ASGI_APPLICATION = 'trusty.asgi.application'
 
 # Database
-# Uses DATABASE_URL environment variable
 DATABASES = {
-    'default': env.db(),
+    'default': env.db('DATABASE_URL')
 }
 
 # Password validation
@@ -235,3 +243,10 @@ if 'test' in sys.argv or 'pytest' in sys.argv[0]:
     }
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
     SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'] = timedelta(days=1)
+
+# Add after BRIDGE_API settings
+OPENAI_SETTINGS = {
+    'API_KEY': env('OPENAI_API_KEY'),
+    'MODEL': env('OPENAI_MODEL', default='gpt-4'),
+    'MOCK_IN_TESTS': env.bool('MOCK_OPENAI_IN_TESTS', default=True),
+}
