@@ -12,7 +12,7 @@ from .serializers import (
     UserSerializer, AgentInstanceSerializer, TransactionSerializer,
     AgentStatusSerializer, AgentSetupSerializer
 )
-from .services import ShoppingService, BridgeWalletService, TrustScoreService
+from .services import ShoppingService, MockBridgeWalletService, TrustScoreService
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class UserRegistrationView(APIView):
             with transaction.atomic():
                 user = serializer.save()
                 # Initialize Bridge wallet
-                wallet_service = BridgeWalletService()
+                wallet_service = MockBridgeWalletService()
                 wallet_address = wallet_service.create_wallet(user)
                 
                 return Response({
@@ -158,7 +158,7 @@ class TransactionVerificationView(APIView):
                 
                 if verification_result['approved']:
                     # Execute USDC transfer
-                    wallet_service = BridgeWalletService()
+                    wallet_service = MockBridgeWalletService()
                     tx_hash = wallet_service.execute_transfer(
                         from_wallet=agent.bridge_wallet_address,
                         to_wallet=transaction_obj.merchant_wallet,
