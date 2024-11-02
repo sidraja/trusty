@@ -116,3 +116,15 @@ See SECURITY.md for reporting security vulnerabilities.
 ## Contributing
 
 This is a private repository. External contributions are not accepted at this time.
+
+## License
+
+Copyright (c) 2024 All Rights Reserved
+
+This software and associated documentation files (the "Software") are proprietary and confidential. 
+All rights are reserved. No part of this Software, including but not limited to the code, documentation, 
+and associated files may be copied, modified, merged, published, distributed, sublicensed, and/or sold 
+without the express written permission of the copyright holder.
+
+Unauthorized copying, modification, or distribution of this Software, its code, documentation, 
+or any other associated materials, via any medium, is strictly prohibited.
