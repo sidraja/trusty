@@ -1,19 +1,24 @@
-from rest_framework.views import exception_handler
-from rest_framework.response import Response
-from rest_framework import status
 import logging
+import sys
+from typing import Optional
 
-logger = logging.getLogger(__name__)
-
-def custom_exception_handler(exc, context):
-    # Call REST framework's default exception handler first
-    response = exception_handler(exc, context)
-
-    if response is None:
-        logger.error(f"Unhandled exception: {str(exc)}")
-        response = Response({
-            'error': 'Internal server error',
-            'detail': str(exc)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    return response 
+def setup_logging(level: Optional[str] = "INFO") -> logging.Logger:
+    """Setup logging configuration for the test suite."""
+    logger = logging.getLogger('api_tests')
+    logger.setLevel(getattr(logging, level))
+    
+    # Remove existing handlers
+    logger.handlers = []
+    
+    # Create console handler
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(getattr(logging, level))
+    
+    # Create formatter
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+    
+    # Add handler to logger
+    logger.addHandler(handler)
+    
+    return logger 

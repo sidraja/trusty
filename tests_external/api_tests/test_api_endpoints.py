@@ -1,6 +1,6 @@
 import requests
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 import logging
 from .utils import setup_logging
@@ -8,6 +8,8 @@ from .utils import setup_logging
 logger = setup_logging()
 
 class APITester:
+    """Test suite for Trusty API endpoints."""
+    
     def __init__(self, base_url: str = "http://localhost:8000"):
         self.base_url = base_url.rstrip('/')
         self.token = None
@@ -16,11 +18,13 @@ class APITester:
             'Content-Type': 'application/json'
         }
     
-    def _update_auth_header(self):
+    def _update_auth_header(self) -> None:
+        """Update authorization header with token if available."""
         if self.token:
             self.headers['Authorization'] = f'Bearer {self.token}'
     
     def _make_request(self, method: str, endpoint: str, data: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Make HTTP request to API endpoint."""
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         self._update_auth_header()
         
@@ -48,18 +52,46 @@ class APITester:
             logger.error(f"Request error: {str(e)}")
             return {}
 
-    def test_registration(self) -> bool:
+    def run_tests(self) -> List[Tuple[str, bool]]:
+        """Run all API tests and return results."""
+        timestamp = int(datetime.now().timestamp())
+        username = f"testuser_{timestamp}"
+        password = "TestPass123!"
+        
+        tests = [
+            ("Registration", lambda: self.test_registration(username, password)),
+            ("Token Obtain", lambda: self.test_token_obtain(username, password)),
+            ("Agent Setup", lambda: self.test_agent_setup()),
+            ("Agent Shopping", lambda: self.test_agent_shopping()),
+            ("Agent Status", lambda: self.test_agent_status()),
+            ("Transaction Verification", lambda: self.test_transaction_verification())
+        ]
+        
+        results = []
+        for test_name, test_func in tests:
+            try:
+                success = test_func()
+                results.append((test_name, success))
+            except Exception as e:
+                logger.error(f"Error in {test_name}: {str(e)}")
+                results.append((test_name, False))
+        
+        return results
+
+    def test_registration(self, username: str, password: str) -> bool:
+        """Test user registration endpoint."""
         logger.info("\n=== Testing User Registration ===")
         data = {
-            "username": f"testuser_{int(datetime.now().timestamp())}",
-            "email": f"test_{int(datetime.now().timestamp())}@example.com",
-            "password": "TestPass123!"
+            "username": username,
+            "email": f"{username}@example.com",
+            "password": password
         }
         
         response = self._make_request('POST', 'api/auth/register/', data)
         return 'user' in response and 'wallet_address' in response
 
     def test_token_obtain(self, username: str, password: str) -> bool:
+        """Test token obtain endpoint."""
         logger.info("\n=== Testing Token Obtain ===")
         data = {
             "username": username,
@@ -73,6 +105,7 @@ class APITester:
         return False
 
     def test_agent_setup(self) -> bool:
+        """Test agent setup endpoint."""
         logger.info("\n=== Testing Agent Setup ===")
         data = {
             "template_id": 1,
@@ -93,6 +126,7 @@ class APITester:
         return False
 
     def test_agent_shopping(self) -> bool:
+        """Test agent shopping endpoint."""
         logger.info("\n=== Testing Agent Shopping ===")
         if not self.agent_id:
             logger.warning("No agent ID available. Skipping test.")
@@ -109,6 +143,7 @@ class APITester:
         return 'task_id' in response
 
     def test_agent_status(self) -> bool:
+        """Test agent status endpoint."""
         logger.info("\n=== Testing Agent Status ===")
         if not self.agent_id:
             logger.warning("No agent ID available. Skipping test.")
@@ -118,6 +153,7 @@ class APITester:
         return 'status' in response and 'trust_score' in response
 
     def test_transaction_verification(self) -> bool:
+        """Test transaction verification endpoint."""
         logger.info("\n=== Testing Transaction Verification ===")
         if not self.agent_id:
             logger.warning("No agent ID available. Skipping test.")
@@ -134,30 +170,9 @@ class APITester:
         return 'status' in response
 
 def main():
+    """Main entry point for the test suite."""
     tester = APITester()
-    
-    # Generate unique username for this test run
-    username = f"testuser_{int(datetime.now().timestamp())}"
-    password = "TestPass123!"
-    
-    # Run all tests
-    tests = [
-        ("Registration", lambda: tester.test_registration()),
-        ("Token Obtain", lambda: tester.test_token_obtain(username, password)),
-        ("Agent Setup", lambda: tester.test_agent_setup()),
-        ("Agent Shopping", lambda: tester.test_agent_shopping()),
-        ("Agent Status", lambda: tester.test_agent_status()),
-        ("Transaction Verification", lambda: tester.test_transaction_verification())
-    ]
-    
-    results = []
-    for test_name, test_func in tests:
-        try:
-            success = test_func()
-            results.append((test_name, success))
-        except Exception as e:
-            logger.error(f"Error in {test_name}: {str(e)}")
-            results.append((test_name, False))
+    results = tester.run_tests()
     
     # Print summary
     logger.info("\n=== Test Summary ===")
