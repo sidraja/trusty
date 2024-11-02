@@ -236,3 +236,35 @@ class TransactionVerificationView(APIView):
                 'error': 'Verification failed',
                 'detail': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StandalonePromptProcessingView(APIView):
+    """Standalone endpoint for processing shopping prompts without authentication."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """
+        Convert natural language shopping prompt into structured constraints.
+        No authentication or user context required.
+        """
+        try:
+            prompt = request.data.get('prompt')
+            if not prompt:
+                return Response({
+                    'error': 'Shopping prompt is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            processor = PromptProcessingService()
+            constraints = processor.process_shopping_prompt(prompt)
+
+            return Response({
+                'constraints': constraints,
+                'source': constraints.get('_source', 'openai')
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Standalone prompt processing failed: {str(e)}")
+            return Response({
+                'error': 'Processing failed',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

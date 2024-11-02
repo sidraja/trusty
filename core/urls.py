@@ -4,7 +4,8 @@ from .views import (
     AgentSetupView,
     AgentShoppingView,
     AgentStatusView,
-    TransactionVerificationView
+    TransactionVerificationView,
+    StandalonePromptProcessingView
 )
 
 app_name = 'core'
@@ -15,4 +16,5 @@ urlpatterns = [
     path('agents/<int:agent_id>/shop/', AgentShoppingView.as_view(), name='agent-shopping'),
     path('agents/<int:agent_id>/status/', AgentStatusView.as_view(), name='agent-status'),
     path('transactions/verify/', TransactionVerificationView.as_view(), name='transaction-verify'),
+    path('prompt/process/', StandalonePromptProcessingView.as_view(), name='prompt-process'),
 ]
